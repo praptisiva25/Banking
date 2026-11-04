@@ -1,0 +1,122 @@
+
+using BankingAPI.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace BankingAPI.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IConfiguration _configuration;
+
+    public AuthController(
+        UserManager<ApplicationUser> userManager,
+        IConfiguration configuration)
+    {
+        _userManager = userManager;
+        _configuration = configuration;
+    }
+
+    [HttpPost("register")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Register(RegisterRequest request)
+    {
+        var existingUser = await _userManager.FindByEmailAsync(request.Email);
+
+        if (existingUser != null)
+            return Conflict(new { message = "Email is already registered." });
+
+        var user = new ApplicationUser
+        {
+            FullName = request.FullName,
+            Email = request.Email,
+            UserName = request.Email,
+            IsActive = true
+        };
+
+        var result = await _userManager.CreateAsync(user, request.Password);
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(new
+            {
+                errors = result.Errors.Select(e => e.Description)
+            });
+        }
+
+        var roleResult = await _userManager.AddToRoleAsync(user, "Customer");
+
+        if (!roleResult.Succeeded)
+        {
+            await _userManager.DeleteAsync(user);
+
+            return StatusCode(500, new
+            {
+                message = "Registration failed because the customer role could not be assigned.",
+                errors = roleResult.Errors.Select(e => e.Description)
+            });
+        }
+
+        return Ok(new { message = "Registration successful." });
+    }
+
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Login(LoginRequest request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+
+        if (user == null || !user.IsActive ||
+            !await _userManager.CheckPasswordAsync(user, request.Password))
+        {
+            return Unauthorized(new { message = "Invalid email or password." });
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.FullName),
+            new(ClaimTypes.Email, user.Email!)
+        };
+
+        claims.AddRange(roles.Select(role =>
+            new Claim(ClaimTypes.Role, role)));
+
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+
+        var token = new JwtSecurityToken(
+            issuer: _configuration["Jwt:Issuer"],
+            audience: _configuration["Jwt:Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: new SigningCredentials(
+                key, SecurityAlgorithms.HmacSha256));
+
+        return Ok(new
+        {
+            token = new JwtSecurityTokenHandler().WriteToken(token),
+            expiresAt = token.ValidTo,
+            user = new
+            {
+                user.Id,
+                user.FullName,
+                user.Email,
+                roles
+            }
+        });
+    }
+}
+
+public record RegisterRequest(string FullName, string Email, string Password);
+public record LoginRequest(string Email, string Password);
