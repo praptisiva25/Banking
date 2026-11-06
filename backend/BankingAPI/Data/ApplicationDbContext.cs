@@ -23,6 +23,7 @@ namespace BankingAPI.Data
         public DbSet<BankingProduct> BankingProducts => Set<BankingProduct>();
         public DbSet<ProductApplication> ProductApplications => Set<ProductApplication>();
         public DbSet<KycDocument> KycDocuments => Set<KycDocument>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

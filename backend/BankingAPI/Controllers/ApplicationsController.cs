@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using BankingAPI.Services;
 
 namespace BankingAPI.Controllers;
 
@@ -15,10 +16,13 @@ namespace BankingAPI.Controllers;
 public class ApplicationsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly AuditLogService _auditLog;
 
-    public ApplicationsController(ApplicationDbContext db)
+    public ApplicationsController(ApplicationDbContext db,  AuditLogService auditLog)
     {
         _db = db;
+        _auditLog = auditLog;
+
     }
 
     // Customer submits an application
@@ -59,6 +63,13 @@ public class ApplicationsController : ControllerBase
 
         _db.ProductApplications.Add(application);
         await _db.SaveChangesAsync();
+        await _auditLog.LogAsync(
+            userId,
+            "Application Submitted",
+            "ProductApplication",
+            application.Id,
+            $"Customer submitted an application for product ID {application.BankingProductId}."
+        );
 
         var response = new ApplicationResponseDto
         {
@@ -159,6 +170,17 @@ public class ApplicationsController : ControllerBase
         application.ReviewedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
+        var reviewerId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!
+        );
+        
+        await _auditLog.LogAsync(
+            reviewerId,
+            $"Application {application.Status}",
+            "ProductApplication",
+            application.Id,
+            $"Admin changed application status to {application.Status}."
+        );
 
         return Ok(new
         {

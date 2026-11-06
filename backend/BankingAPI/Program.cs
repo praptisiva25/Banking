@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using BankingAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,6 +73,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddDataProtection();
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<AuditLogService>();
 
 builder.Services.AddControllers();
 

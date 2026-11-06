@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using BankingAPI.Services;
 
 namespace BankingAPI.Controllers;
 
@@ -16,13 +17,16 @@ public class KycController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly AuditLogService _auditLog;
 
     public KycController(
         ApplicationDbContext db,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        AuditLogService auditLog)
     {
         _db = db;
         _environment = environment;
+        _auditLog = auditLog;
     }
 
     // Customer uploads KYC document
@@ -93,6 +97,14 @@ public class KycController : ControllerBase
 
             _db.KycDocuments.Add(document);
             await _db.SaveChangesAsync();
+
+            await _auditLog.LogAsync(
+                userId,
+                "KYC Document Uploaded",
+                "KycDocument",
+                document.Id,
+                $"Customer uploaded a {document.DocumentType} document."
+            );
 
             return Ok(new
             {
