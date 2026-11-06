@@ -1,5 +1,6 @@
 
 using BankingAPI.Models;
+using BankingAPI.DTOs.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -27,7 +28,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("register")]
     [AllowAnonymous]
-    public async Task<IActionResult> Register(RegisterRequest request)
+    public async Task<IActionResult> Register(RegisterRequestDto request)
     {
         var existingUser = await _userManager.FindByEmailAsync(request.Email);
 
@@ -70,7 +71,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> Login(LoginRequestDto request)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
@@ -103,20 +104,21 @@ public class AuthController : ControllerBase
             signingCredentials: new SigningCredentials(
                 key, SecurityAlgorithms.HmacSha256));
 
-        return Ok(new
+        var response = new AuthResponseDto
         {
-            token = new JwtSecurityTokenHandler().WriteToken(token),
-            expiresAt = token.ValidTo,
-            user = new
+            Token = new JwtSecurityTokenHandler().WriteToken(token),
+            ExpiresAt = token.ValidTo,
+            User = new AuthUserDto
             {
-                user.Id,
-                user.FullName,
-                user.Email,
-                roles
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email!,
+                Roles = roles
             }
-        });
+        };
+        
+        return Ok(response);
     }
 }
 
-public record RegisterRequest(string FullName, string Email, string Password);
-public record LoginRequest(string Email, string Password);
+

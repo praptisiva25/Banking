@@ -1,7 +1,9 @@
 
 using BankingAPI.Data;
+using BankingAPI.DTOs.Customer;
 using BankingAPI.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -14,10 +16,14 @@ namespace BankingAPI.Controllers;
 public class CustomerController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public CustomerController(ApplicationDbContext db)
+    public CustomerController(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> userManager)
     {
         _db = db;
+        _userManager = userManager;
     }
 
     [HttpGet("profile")]
@@ -32,12 +38,31 @@ public class CustomerController : ControllerBase
         if (profile == null)
             return NotFound(new { message = "Profile not found." });
 
-        return Ok(profile);
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        var response = new CustomerProfileResponseDto
+        {
+            Id = profile.Id,
+            FullName = user.FullName,
+            Email = user.Email!,
+            PhoneNumber = profile.PhoneNumber,
+            Address = profile.Address,
+            City = profile.City,
+            State = profile.State,
+            PostalCode = profile.PostalCode,
+            DateOfBirth = profile.DateOfBirth,
+            UpdatedAt = profile.UpdatedAt
+        };
+
+        return Ok(response);
     }
 
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile(
-        CustomerProfileRequest request)
+        CustomerProfileRequestDto request)
     {
         var userId = int.Parse(
             User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -61,19 +86,29 @@ public class CustomerController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        var response = new CustomerProfileResponseDto
+        {
+            Id = profile.Id,
+            FullName = user.FullName,
+            Email = user.Email!,
+            PhoneNumber = profile.PhoneNumber,
+            Address = profile.Address,
+            City = profile.City,
+            State = profile.State,
+            PostalCode = profile.PostalCode,
+            DateOfBirth = profile.DateOfBirth,
+            UpdatedAt = profile.UpdatedAt
+        };
+
         return Ok(new
         {
             message = "Profile updated successfully.",
-            profile
+            profile = response
         });
     }
 }
-
-public record CustomerProfileRequest(
-    string PhoneNumber,
-    string Address,
-    string City,
-    string State,
-    string PostalCode,
-    DateOnly? DateOfBirth
-);

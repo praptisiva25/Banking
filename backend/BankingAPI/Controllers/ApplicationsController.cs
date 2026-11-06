@@ -1,5 +1,6 @@
 
 using BankingAPI.Data;
+using BankingAPI.DTOs.Applications;
 using BankingAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,13 +23,15 @@ public class ApplicationsController : ControllerBase
 
     // Customer submits an application
     [HttpPost]
-    public async Task<IActionResult> Submit(ApplicationRequest request)
+    public async Task<IActionResult> Submit(
+        CreateApplicationRequestDto request)
     {
         var userId = int.Parse(
             User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var product = await _db.BankingProducts
-            .FirstOrDefaultAsync(p => p.Id == request.BankingProductId && p.IsActive);
+            .FirstOrDefaultAsync(p =>
+                p.Id == request.BankingProductId && p.IsActive);
 
         if (product == null)
             return NotFound(new { message = "Product not found." });
@@ -40,7 +43,10 @@ public class ApplicationsController : ControllerBase
             });
 
         if (request.RequestedAmount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
+            return BadRequest(new
+            {
+                message = "Amount must be greater than zero."
+            });
 
         var application = new ProductApplication
         {
@@ -54,16 +60,30 @@ public class ApplicationsController : ControllerBase
         _db.ProductApplications.Add(application);
         await _db.SaveChangesAsync();
 
+        var response = new ApplicationResponseDto
+        {
+            Id = application.Id,
+            UserId = application.UserId,
+            BankingProductId = application.BankingProductId,
+            Product = product.Name,
+            RequestedAmount = application.RequestedAmount,
+            Status = application.Status,
+            Remarks = application.Remarks,
+            AppliedAt = application.AppliedAt,
+            ReviewedAt = application.ReviewedAt
+        };
+
         return Ok(new
         {
             message = "Application submitted successfully.",
-            application
+            application = response
         });
     }
 
     // Customer views their own applications
     [HttpGet("my")]
-    public async Task<IActionResult> GetMyApplications()
+    public async Task<ActionResult<List<ApplicationResponseDto>>>
+        GetMyApplications()
     {
         var userId = int.Parse(
             User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -71,18 +91,20 @@ public class ApplicationsController : ControllerBase
         var applications = await _db.ProductApplications
             .Where(a => a.UserId == userId)
             .OrderByDescending(a => a.AppliedAt)
-            .Select(a => new
+            .Select(a => new ApplicationResponseDto
             {
-                a.Id,
+                Id = a.Id,
+                UserId = a.UserId,
+                BankingProductId = a.BankingProductId,
                 Product = _db.BankingProducts
-                    .Where(p => p.Id == a.BankingProductId)
-                    .Select(p => p.Name)
-                    .FirstOrDefault(),
-                a.RequestedAmount,
-                a.Status,
-                a.Remarks,
-                a.AppliedAt,
-                a.ReviewedAt
+                 .Where(p => p.Id == a.BankingProductId)
+                 .Select(p => p.Name)
+                 .FirstOrDefault() ?? string.Empty,
+                RequestedAmount = a.RequestedAmount,
+                Status = a.Status,
+                Remarks = a.Remarks,
+                AppliedAt = a.AppliedAt,
+                ReviewedAt = a.ReviewedAt
             })
             .ToListAsync();
 
@@ -92,19 +114,25 @@ public class ApplicationsController : ControllerBase
     // Admin views all applications
     [HttpGet("all")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetAllApplications()
+    public async Task<ActionResult<List<ApplicationResponseDto>>>
+        GetAllApplications()
     {
         var applications = await _db.ProductApplications
             .OrderByDescending(a => a.AppliedAt)
-            .Select(a => new
+            .Select(a => new ApplicationResponseDto
             {
-                a.Id,
-                a.UserId,
-                a.BankingProductId,
-                a.RequestedAmount,
-                a.Status,
-                a.Remarks,
-                a.AppliedAt
+                Id = a.Id,
+                UserId = a.UserId,
+                BankingProductId = a.BankingProductId,
+                Product = _db.BankingProducts
+                 .Where(p => p.Id == a.BankingProductId)
+                 .Select(p => p.Name)
+                 .FirstOrDefault() ?? string.Empty,
+                RequestedAmount = a.RequestedAmount,
+                Status = a.Status,
+                Remarks = a.Remarks,
+                AppliedAt = a.AppliedAt,
+                ReviewedAt = a.ReviewedAt
             })
             .ToListAsync();
 
@@ -116,16 +144,16 @@ public class ApplicationsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStatus(
         int id,
-        UpdateApplicationStatusRequest request)
+        UpdateApplicationStatusRequestDto request)
     {
         var application = await _db.ProductApplications
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (application == null)
-            return NotFound(new { message = "Application not found." });
-
-        if (request.Status != "Approved" && request.Status != "Rejected")
-            return BadRequest(new { message = "Invalid status." });
+            return NotFound(new
+            {
+                message = "Application not found."
+            });
 
         application.Status = request.Status;
         application.ReviewedAt = DateTime.UtcNow;
@@ -135,16 +163,11 @@ public class ApplicationsController : ControllerBase
         return Ok(new
         {
             message = "Application status updated.",
-            application.Id,
-            application.Status
+            application = new
+            {
+                application.Id,
+                application.Status
+            }
         });
     }
 }
-
-public record ApplicationRequest(
-    int BankingProductId,
-    decimal RequestedAmount,
-    string? Remarks
-);
-
-public record UpdateApplicationStatusRequest(string Status);

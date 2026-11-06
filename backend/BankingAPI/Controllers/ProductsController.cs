@@ -1,5 +1,6 @@
 
 using BankingAPI.Data;
+using BankingAPI.DTOs.Products;
 using BankingAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,10 +22,19 @@ public class ProductsController : ControllerBase
     // List active products
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetProducts()
+    public async Task<ActionResult<List<ProductResponseDto>>> GetProducts()
     {
         var products = await _db.BankingProducts
             .Where(p => p.IsActive)
+            .Select(p => new ProductResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Category = p.Category,
+                Description = p.Description,
+                InterestRate = p.InterestRate,
+                MinimumAmount = p.MinimumAmount
+            })
             .ToListAsync();
 
         return Ok(products);
@@ -33,10 +43,20 @@ public class ProductsController : ControllerBase
     // Get product by ID
     [HttpGet("{id:int}")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetProduct(int id)
+    public async Task<ActionResult<ProductResponseDto>> GetProduct(int id)
     {
         var product = await _db.BankingProducts
-            .FirstOrDefaultAsync(p => p.Id == id && p.IsActive);
+            .Where(p => p.Id == id && p.IsActive)
+            .Select(p => new ProductResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Category = p.Category,
+                Description = p.Description,
+                InterestRate = p.InterestRate,
+                MinimumAmount = p.MinimumAmount
+            })
+            .FirstOrDefaultAsync();
 
         if (product == null)
             return NotFound(new { message = "Product not found." });
@@ -47,8 +67,8 @@ public class ProductsController : ControllerBase
     // Create product (Admin only)
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> CreateProduct(
-        BankingProductRequest request)
+    public async Task<ActionResult<ProductResponseDto>> CreateProduct(
+        CreateProductRequestDto request)
     {
         var product = new BankingProduct
         {
@@ -62,17 +82,19 @@ public class ProductsController : ControllerBase
         _db.BankingProducts.Add(product);
         await _db.SaveChangesAsync();
 
+        var response = new ProductResponseDto
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Category = product.Category,
+            Description = product.Description,
+            InterestRate = product.InterestRate,
+            MinimumAmount = product.MinimumAmount
+        };
+
         return CreatedAtAction(
             nameof(GetProduct),
             new { id = product.Id },
-            product);
+            response);
     }
 }
-
-public record BankingProductRequest(
-    string Name,
-    string Category,
-    string Description,
-    decimal InterestRate,
-    decimal MinimumAmount
-);
