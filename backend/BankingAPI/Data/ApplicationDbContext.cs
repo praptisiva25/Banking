@@ -24,6 +24,7 @@ namespace BankingAPI.Data
         public DbSet<ProductApplication> ProductApplications => Set<ProductApplication>();
         public DbSet<KycDocument> KycDocuments => Set<KycDocument>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

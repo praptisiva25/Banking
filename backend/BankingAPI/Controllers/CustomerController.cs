@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using BankingAPI.Services;
 
 namespace BankingAPI.Controllers;
 
@@ -17,13 +18,15 @@ public class CustomerController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly AuditLogService _auditLog;
 
     public CustomerController(
         ApplicationDbContext db,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager, AuditLogService auditLog)
     {
         _db = db;
         _userManager = userManager;
+         _auditLog = auditLog;
     }
 
     [HttpGet("profile")]
@@ -85,6 +88,14 @@ public class CustomerController : ControllerBase
         profile.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            userId,
+            "Customer Profile Updated",
+            "CustomerProfile",
+            profile.Id,
+            "Customer updated their profile."
+        );
 
         var user = await _userManager.FindByIdAsync(userId.ToString());
 

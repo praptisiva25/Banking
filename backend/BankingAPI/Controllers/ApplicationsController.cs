@@ -17,11 +17,13 @@ public class ApplicationsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly AuditLogService _auditLog;
+    private readonly NotificationService _notificationService;
 
-    public ApplicationsController(ApplicationDbContext db,  AuditLogService auditLog)
+    public ApplicationsController(ApplicationDbContext db,  AuditLogService auditLog, NotificationService notificationService)
     {
         _db = db;
         _auditLog = auditLog;
+        _notificationService = notificationService;
 
     }
 
@@ -63,6 +65,11 @@ public class ApplicationsController : ControllerBase
 
         _db.ProductApplications.Add(application);
         await _db.SaveChangesAsync();
+        await _notificationService.CreateAsync(
+            userId,
+            "Application Submitted",
+            $"Your application for {product.Name} has been submitted successfully."
+        );
         await _auditLog.LogAsync(
             userId,
             "Application Submitted",
@@ -180,6 +187,12 @@ public class ApplicationsController : ControllerBase
             "ProductApplication",
             application.Id,
             $"Admin changed application status to {application.Status}."
+        );
+
+        await _notificationService.CreateAsync(
+            application.UserId,
+            $"Application {application.Status}",
+            $"Your application for {application.Status.ToLower()} has been {application.Status.ToLower()}."
         );
 
         return Ok(new

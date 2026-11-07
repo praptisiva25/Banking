@@ -5,6 +5,8 @@ using BankingAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using BankingAPI.Services;
+using System.Security.Claims;
 
 namespace BankingAPI.Controllers;
 
@@ -13,10 +15,12 @@ namespace BankingAPI.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly AuditLogService _auditLog;
 
-    public ProductsController(ApplicationDbContext db)
+    public ProductsController(ApplicationDbContext db, AuditLogService auditLog)
     {
         _db = db;
+        _auditLog = auditLog;
     }
 
     // List active products
@@ -81,6 +85,18 @@ public class ProductsController : ControllerBase
 
         _db.BankingProducts.Add(product);
         await _db.SaveChangesAsync();
+
+        var adminId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!
+        );
+        
+        await _auditLog.LogAsync(
+            adminId,
+            "Banking Product Created",
+            "BankingProduct",
+            product.Id,
+            $"Admin created the {product.Name} product."
+        );
 
         var response = new ProductResponseDto
         {

@@ -81,6 +81,14 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid email or password." });
         }
 
+        if (!user.IsActive)
+        {
+            return Unauthorized(new
+            {
+                message = "Your account is inactive. Please contact the administrator."
+            });
+        }
+
         var roles = await _userManager.GetRolesAsync(user);
 
         var claims = new List<Claim>

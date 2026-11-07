@@ -58,22 +58,50 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtKey)),
-
+            
             ValidateIssuer = true,
             ValidIssuer = jwtIssuer,
-
+            
             ValidateAudience = true,
             ValidAudience = jwtAudience,
-
+            
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+        
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userManager = context.HttpContext.RequestServices
+                .GetRequiredService<UserManager<ApplicationUser>>();
+                
+                var userId = context.Principal?
+                .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?
+                .Value;
+                
+                if (!int.TryParse(userId, out var id))
+                {
+                    context.Fail("Invalid user identity.");
+                    return;
+                }
+
+                var user = await userManager.FindByIdAsync(id.ToString());
+
+                if (user == null || !user.IsActive)
+                {
+                    context.Fail("User account is inactive or unavailable.");
+                }
+            }
+        };
     });
+
 
 builder.Services.AddAuthorization();
 builder.Services.AddDataProtection();
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<NotificationService>();
 
 builder.Services.AddControllers();
 

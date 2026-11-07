@@ -18,15 +18,18 @@ public class KycController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
     private readonly AuditLogService _auditLog;
+    private readonly NotificationService _notificationService;
 
     public KycController(
         ApplicationDbContext db,
         IWebHostEnvironment environment,
-        AuditLogService auditLog)
+        AuditLogService auditLog, 
+        NotificationService notificationService)
     {
         _db = db;
         _environment = environment;
         _auditLog = auditLog;
+        _notificationService = notificationService;
     }
 
     // Customer uploads KYC document
@@ -106,6 +109,11 @@ public class KycController : ControllerBase
                 $"Customer uploaded a {document.DocumentType} document."
             );
 
+            await _notificationService.CreateAsync(
+                document.UserId,
+                $"KYC Document {document.Status}",
+                $"Your {document.DocumentType} document has been {document.Status.ToLower()}."
+            );
             return Ok(new
             {
                 message = "KYC document uploaded successfully.",
@@ -207,6 +215,14 @@ public class KycController : ControllerBase
         document.ReviewedBy = reviewerId;
 
         await _db.SaveChangesAsync();
+        
+        await _auditLog.LogAsync(
+            reviewerId,
+            $"KYC Document {document.Status}",
+            "KycDocument",
+            document.Id,
+            $"Officer reviewed the {document.DocumentType} document and marked it as {document.Status}."
+        );
 
         return Ok(new
         {
