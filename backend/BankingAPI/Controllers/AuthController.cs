@@ -127,6 +127,37 @@ public class AuthController : ControllerBase
         
         return Ok(response);
     }
+
+    
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { message = "Invalid authentication token." });
+        }
+        
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null || !user.IsActive)
+        {
+            return Unauthorized(new { message = "User account not found or inactive." });
+        }
+        
+        var roles = await _userManager.GetRolesAsync(user);
+        
+        return Ok(new AuthUserDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email!,
+            Roles = roles
+        });
+    }
+
 }
 
 

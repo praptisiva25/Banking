@@ -10,6 +10,17 @@ using BankingAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var connectionString = builder.Configuration
     .GetConnectionString("DefaultConnection");
 
@@ -112,7 +123,12 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseCors("FrontendPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -128,16 +144,6 @@ app.MapGet("/db-test", async (ApplicationDbContext db) =>
 
 app.MapControllers();
 
-app.MapGet("/api/auth/me", [Microsoft.AspNetCore.Authorization.Authorize] 
-    (System.Security.Claims.ClaimsPrincipal user) =>
-{
-    return Results.Ok(new
-    {
-        id = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-        name = user.Identity?.Name,
-        email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-    });
-});
 
 using (var scope = app.Services.CreateScope())
 {

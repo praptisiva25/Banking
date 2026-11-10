@@ -25,7 +25,8 @@ namespace BankingAPI.Data
         public DbSet<KycDocument> KycDocuments => Set<KycDocument>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<Notification> Notifications => Set<Notification>();
-
+        public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+        public DbSet<TicketMessage> TicketMessages => Set<TicketMessage>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -71,6 +72,33 @@ namespace BankingAPI.Data
                 entity.HasIndex(u => u.Email)
                     .IsUnique();
             });
+
+            modelBuilder.Entity<SupportTicket>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<SupportTicket>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(t => t.AssignedOfficerId)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<TicketMessage>()
+            .HasOne<SupportTicket>()
+            .WithMany()
+            .HasForeignKey(m => m.SupportTicketId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+            modelBuilder.Entity<TicketMessage>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(m => m.SenderUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<TicketMessage>()
+            .HasIndex(m => new { m.SupportTicketId, m.SentAt });
         }
     }
 }
